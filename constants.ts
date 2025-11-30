@@ -114,9 +114,10 @@ export const AI_PROMPTS = {
   - Return as Markdown.`,
 };
 
+// Updated model list with provider information
 export const AI_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-2.5-pro',
-  'gemini-2.0-flash'
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'gemini' },
+  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', provider: 'gemini' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai' },
+  { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', provider: 'openai' },
 ];

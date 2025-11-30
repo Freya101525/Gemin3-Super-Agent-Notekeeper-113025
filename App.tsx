@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -12,7 +12,8 @@ import {
   Zap, 
   Award,
   PenTool,
-  Flower2
+  Flower2,
+  Terminal
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -52,6 +53,8 @@ const App: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [observationText, setObservationText] = useState('');
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+  
   const [pipelineSteps, setPipelineSteps] = useState<PipelineStep[]>([
     { agentId: 'AG-01', name: 'Compliance Check', status: 'pending' },
     { agentId: 'AG-02', name: 'Risk Analysis', status: 'pending' },
@@ -80,9 +83,16 @@ const App: React.FC = () => {
     }
   }, [state.currentFlowerId, state.themeMode, currentTheme]);
 
+  // Auto-scroll logs
+  useEffect(() => {
+      if (logsEndRef.current) {
+          logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+  }, [logs]);
+
   // --- Handlers ---
   const addLog = (message: string, type: LogEntry['type'] = 'info') => {
-    setLogs(prev => [{ id: Date.now().toString(), timestamp: new Date().toLocaleTimeString(), message, type }, ...prev]);
+    setLogs(prev => [...prev, { id: Date.now().toString(), timestamp: new Date().toLocaleTimeString(), message, type }]);
   };
 
   const handleRunPipeline = async () => {
@@ -111,7 +121,8 @@ const App: React.FC = () => {
                 // Using Gemini Service
                 output = await generateText(
                     `System: You are an FDA 510(k) reviewer. Briefly analyze: ${inputText}`,
-                    state.apiKeys.gemini
+                    state.apiKeys.gemini,
+                    { provider: 'gemini' }
                 );
             } catch (e) {
                 output = "API Call Failed. Using simulation.";
@@ -149,7 +160,7 @@ const App: React.FC = () => {
     <div className="min-h-screen transition-colors duration-300 font-sans flex text-gray-800 dark:text-gray-100" style={{ backgroundColor: 'var(--bg-color)' }}>
       
       {/* Sidebar */}
-      <aside className="w-20 lg:w-64 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-r border-gray-200 dark:border-gray-800 flex flex-col fixed h-full z-10 transition-all">
+      <aside className="w-20 lg:w-64 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-r border-gray-200 dark:border-gray-800 flex flex-col fixed h-full z-10 transition-all shadow-xl">
          <div className="p-6 flex items-center justify-center lg:justify-start space-x-3 border-b border-gray-100 dark:border-gray-800">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: currentTheme.primaryColor }}>
                <Activity size={24} />
@@ -157,7 +168,7 @@ const App: React.FC = () => {
             <span className="hidden lg:block font-bold text-lg tracking-tight">FDA Studio</span>
          </div>
 
-         <nav className="flex-1 p-4 space-y-2">
+         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             {[
                 { id: 'input', label: t.input, icon: <FileText size={20} /> },
                 { id: 'pipeline', label: t.pipeline, icon: <GitBranch size={20} /> },
@@ -178,9 +189,9 @@ const App: React.FC = () => {
                     <span className="hidden lg:block font-medium">{item.label}</span>
                 </button>
             ))}
-         </nav>
 
-         <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
+            <div className="my-4 border-t border-gray-100 dark:border-gray-800"></div>
+
              <button onClick={() => setIsWheelOpen(true)} className="w-full flex items-center space-x-3 p-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
                 <Flower2 size={20} style={{ color: currentTheme.primaryColor }} />
                 <span className="hidden lg:block font-medium">{t.spinWheel}</span>
@@ -189,6 +200,30 @@ const App: React.FC = () => {
                 <Settings size={20} />
                 <span className="hidden lg:block font-medium">{t.settings}</span>
              </button>
+         </nav>
+
+         {/* Execution Log in Sidebar */}
+         <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-black/20 h-48 lg:h-64 flex flex-col">
+             <div className="flex items-center gap-2 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                 <Terminal size={12} /> Execution Logs
+             </div>
+             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+                 {logs.length === 0 ? (
+                     <div className="text-xs text-gray-400 italic text-center py-4">No logs yet</div>
+                 ) : (
+                     logs.map(log => (
+                         <div key={log.id} className="text-xs p-2 rounded bg-white dark:bg-gray-800/80 border-l-2 shadow-sm" style={{ borderColor: log.type === 'error' ? 'red' : log.type === 'success' ? 'green' : currentTheme.secondaryColor }}>
+                             <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                                 <span>{log.timestamp}</span>
+                             </div>
+                             <div className="text-gray-700 dark:text-gray-300 break-words leading-tight">
+                                 {log.message}
+                             </div>
+                         </div>
+                     ))
+                 )}
+                 <div ref={logsEndRef} />
+             </div>
          </div>
       </aside>
 
@@ -239,42 +274,26 @@ const App: React.FC = () => {
             
             {activeTab === 'input' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-                    <div className="lg:col-span-2 flex flex-col gap-4">
+                    <div className="lg:col-span-3 flex flex-col gap-4">
                         <div className="flex-1 flex flex-col">
                             <label className="mb-2 font-semibold text-gray-700 dark:text-gray-300">510(k) Template Content</label>
                             <textarea 
-                                className="flex-1 w-full p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 outline-none transition-all resize-none font-mono text-sm"
+                                className="flex-1 w-full min-h-[300px] p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 outline-none transition-all resize-none font-mono text-sm"
                                 style={{ '--tw-ring-color': currentTheme.primaryColor } as React.CSSProperties}
                                 placeholder="Paste your template here..."
                                 value={inputText}
                                 onChange={e => setInputText(e.target.value)}
                             />
                         </div>
-                        <div className="h-1/3 flex flex-col">
+                        <div className="flex-1 flex flex-col">
                             <label className="mb-2 font-semibold text-gray-700 dark:text-gray-300">Observations</label>
                             <textarea 
-                                className="flex-1 w-full p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 outline-none transition-all resize-none text-sm"
+                                className="flex-1 w-full min-h-[150px] p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 outline-none transition-all resize-none text-sm"
                                 style={{ '--tw-ring-color': currentTheme.primaryColor } as React.CSSProperties}
                                 placeholder="Notes and observations..."
                                 value={observationText}
                                 onChange={e => setObservationText(e.target.value)}
                             />
-                        </div>
-                    </div>
-                    <div className="lg:col-span-1 flex flex-col gap-4">
-                        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 h-full overflow-hidden flex flex-col">
-                             <h3 className="font-bold mb-4 flex items-center gap-2">
-                                <Activity size={16} /> Activity Log
-                             </h3>
-                             <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                                {logs.length === 0 && <p className="text-gray-400 text-sm text-center mt-10">No activity yet</p>}
-                                {logs.map(log => (
-                                    <div key={log.id} className="text-xs p-2 rounded bg-gray-50 dark:bg-gray-700/50 border-l-2" style={{ borderColor: log.type === 'error' ? 'red' : log.type === 'success' ? 'green' : currentTheme.secondaryColor }}>
-                                        <span className="text-gray-400 mr-2">[{log.timestamp}]</span>
-                                        {log.message}
-                                    </div>
-                                ))}
-                             </div>
                         </div>
                     </div>
                 </div>
@@ -333,7 +352,7 @@ const App: React.FC = () => {
             {activeTab === 'notes' && (
                <NoteKeeper 
                  theme={currentTheme}
-                 apiKey={state.apiKeys.gemini}
+                 apiKeys={state.apiKeys}
                  onLog={addLog}
                />
             )}
